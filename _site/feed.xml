@@ -4,7 +4,7 @@
   <id>http://localhost:4000/</id>
   <title>Mitchell Gibson Docs</title>
   <subtitle>A documentation site showcasing some of the things I've worked on.</subtitle>
-  <updated>2022-06-26T01:46:00-04:00</updated>
+  <updated>2022-06-26T03:25:30-04:00</updated>
   <author>
     <name>Mitchell Gibson</name>
     <uri>http://localhost:4000/</uri>
@@ -20,11 +20,11 @@
 
   
   <entry>
-    <title>Zeek_intel</title>
-    <link href="http://localhost:4000/posts/zeek_intel/" rel="alternate" type="text/html" title="Zeek_intel" />
-    <published>2022-06-23T00:00:00-04:00</published>
+    <title>Utilizing Zeek Intel</title>
+    <link href="http://localhost:4000/posts/zeek_intel/" rel="alternate" type="text/html" title="Utilizing Zeek Intel" />
+    <published>2022-06-23T13:00:00-04:00</published>
   
-    <updated>2022-06-23T00:00:00-04:00</updated>
+    <updated>2022-06-26T03:06:38-04:00</updated>
   
     <id>http://localhost:4000/posts/zeek_intel/</id>
     <content src="http://localhost:4000/posts/zeek_intel/" />
@@ -33,6 +33,12 @@
     </author>
 
   
+    
+    <category term="zeek" />
+    
+    <category term="intelligence" />
+    
+    <category term="automation" />
     
   
 
@@ -44,7 +50,8 @@
 
 
 
-      
+      Zeek Intel
+Test
 
     </summary>
   
