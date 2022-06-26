@@ -1,0 +1,98 @@
+
+
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>http://localhost:4000/</id>
+  <title>Mitchell Gibson Docs</title>
+  <subtitle>A documentation site showcasing some of the things I've worked on.</subtitle>
+  <updated>2022-06-26T01:46:00-04:00</updated>
+  <author>
+    <name>Mitchell Gibson</name>
+    <uri>http://localhost:4000/</uri>
+  </author>
+  <link rel="self" type="application/atom+xml" href="http://localhost:4000/feed.xml"/>
+  <link rel="alternate" type="text/html" hreflang="en"
+    href="http://localhost:4000/"/>
+  <generator uri="https://jekyllrb.com/" version="4.2.2">Jekyll</generator>
+  <rights> © 2022 Mitchell Gibson </rights>
+  <icon>/assets/img/favicons/favicon.ico</icon>
+  <logo>/assets/img/favicons/favicon-96x96.png</logo>
+
+
+  
+  <entry>
+    <title>Zeek_intel</title>
+    <link href="http://localhost:4000/posts/zeek_intel/" rel="alternate" type="text/html" title="Zeek_intel" />
+    <published>2022-06-23T00:00:00-04:00</published>
+  
+    <updated>2022-06-23T00:00:00-04:00</updated>
+  
+    <id>http://localhost:4000/posts/zeek_intel/</id>
+    <content src="http://localhost:4000/posts/zeek_intel/" />
+    <author>
+      <name>Mitchell Gibson</name>
+    </author>
+
+  
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      
+
+    </summary>
+  
+
+  </entry>
+
+  
+  <entry>
+    <title>Building a Home Lab</title>
+    <link href="http://localhost:4000/posts/test/" rel="alternate" type="text/html" title="Building a Home Lab" />
+    <published>2022-06-19T13:00:00-04:00</published>
+  
+    <updated>2022-06-19T13:00:00-04:00</updated>
+  
+    <id>http://localhost:4000/posts/test/</id>
+    <content src="http://localhost:4000/posts/test/" />
+    <author>
+      <name>Mitchell Gibson</name>
+    </author>
+
+  
+    
+    <category term="homelab" />
+    
+    <category term="proxmox" />
+    
+    <category term="Networking" />
+    
+  
+
+  
+    <summary>
+      
+
+
+
+
+
+      Home Lab Principles
+
+I thought it would be fitting for my first post to be about the homelab that I designed, created and built. There are a lot of homelab guides on the internet, but I noticed that none of them seem to have a focus of learning cybersecurity principles. With that in mind, my homelab is designed to serve 3 main functions.
+
+  Create a sandbox environment airgapped and isolated fr...
+    </summary>
+  
+
+  </entry>
+
+</feed>
+
+
