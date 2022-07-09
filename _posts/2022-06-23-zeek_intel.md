@@ -28,12 +28,29 @@ I've been in many SOC environments and I've come to find that the most valuable 
 The real only true prerequisite required is to have Zeek ingesting traffic for you. However one of the big downsides with Zeek Intel is the formatting required to get it working. Normally this isn't a big issue, but when you have potentially tens of thousands of intelligence you want referenced it can become a hassel. That's why I tweaked a foratting script I found online to make it compatible with SecurityOnion2 that will take CSV files and format them accordingly. The script will be provided below along with a copy of a slide-deck presentation I've given to Cyber Professionals to implement this solution in their deployments.
 
 # Utilizing Zeek Intel with SO2
+Once you're ready to implement this into your environment, first you need to push your list of intelligence in csv format and the provided script below. For examples of Intelligence, below is a link to an open source repository containing csv files with various IOC types.
 
+https://osint.digitalside.it/Threat-Intel/csv/
+ 
+ Then you will need to rename the script to ensure it ends with .py and give if full permissions.
+
+ ```bash
+ sudo mv zeek_importer.txt zeek_importer.py
+
+sudo chmod 777 zeek_importer.py
+ ```
+
+Then you will want to create a temporary intel.dat file to later append your indicators to.
+
+```bash
+sudo cp /opt/so/saltstack/default/salt/zeek/policy/intel/* /opt/so/saltstack/local/salt/zeek/policy/intel/
+```
+You will now have an intel.dat file located in the above directory. This is imporant as we essentially copied over files from a reference direcotry into our Security Onion 2 production directory.
 # Resources
 
 [Professional Slide Deck](/assets/zeekintel/Blog_Zeek_Intel_2.pptx)
 
-**Python Code for Formatting:**
+**Python Code for Formatting Zeek Intelligence:**
 
 ```Python3
 #!/usr/local/bin/python3
