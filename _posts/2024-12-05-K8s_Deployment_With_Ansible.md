@@ -102,6 +102,7 @@ ansible-playbook firewall.yaml
       vars:
         ports_to_open:
           - 179/tcp
+          - 5473/tcp
           - 6443/tcp
           - 2379-2380/tcp
           - 10250/tcp
@@ -121,6 +122,7 @@ ansible-playbook firewall.yaml
       vars:
         worker_ports:
           - 179/tcp
+          - 5473/tcp
           - 10250/tcp
           - 10256/tcp
           - 30000-32767/tcp
@@ -216,3 +218,396 @@ This is where the real meat and patatoes of the playbook come into play. The imp
 ## Installing a CNI
 Once Kubadm is installed, we have to configure the networking. Thankfully we can have software called a container network interface (CNI) handle the routing and switching inside the cluster. Again the script manually installs the CNI, configures it based off our current configuration and apply it. The CNI will now show up as a pod running inside the cluster. The important thing to note is if you changed your pod_cidr network from earlier you will also want to change it here too.
 ![collector][/assets/k8s/k86.png.png]
+
+## Joining the Worker Nodes
+At this point in the script, kubeadm has been successfully deployed, the networking is in place and all there is left to do is joing the worker nodes to the manager. This is a relatively simple process, first you take the output of the `kubeadm token create --print-join-command` which will print the command that the workers will use to connect back to the manager and then run it on the worker nodes. I had to play around with variables, so that the manager didn't accidentally try to join itself, so the workaround was to download the output of the above command to a file locally on the ansible-controller and then push it to the worker nodes and have them run the command from the file.
+![collector][/assets/k8s/k87.png]
+
+# Configuring our Ansible-Controller to manage our K8s cluster
+Congrats! At this point, assuming everything went smooth you should now have a fully functioning Kubernetes cluster ready to deploy pods (containers). Before we do some diagnostic checks, lets first configure our ansible-controller to be able to administer the cluster; preventing us from having to ssh into a node. Again here is a quick playbook that will configure the localhost to administer the cluster (assuming you're logged in as the root user):
+```yaml
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Download kubectl binary
+      get_url:
+        url: "https://dl.k8s.io/release/v1.27.3/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Verify kubectl installation
+      command: kubectl version --client
+
+    - name: Create the kubeconfig directory
+      ansible.builtin.file:
+        path: /root/.kube
+        state: directory
+        mode: 0755
+
+    - name: Fetch kubeconfig from control plane node
+      ansible.builtin.fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        flat: yes
+      delegate_to: mainrhel
+      become: true
+
+    - name: Set KUBECONFIG environment variable
+      ansible.builtin.lineinfile:
+        path: /root/.bashrc
+        line: 'export KUBECONFIG=/root/.kube/config'
+        create: yes
+
+    - name: Add alias for kubectl
+      ansible.builtin.lineinfile:
+        path: /root/.bashrc
+        line: 'alias k=kubectl'
+        create: yes
+
+    - name: Enable tab auto-completion
+      shell: source <(kubectl completion bash)" >> ~/.bashrc
+      args:
+        executable: /bin/bash
+
+    - name: Apply tab auto-completion
+      shell: source ~/.bashrc
+      args:
+        executable: /bin/bash
+```
+
+# Debugging and Running our first Pod
+Now that we have the ability to manage our cluster locally, let's first ensure that all of our nodes are connected and in the ready status:
+```bash
+kubectl get nodes
+```
+![collector][/assets/k8s/k88.png]
+
+Everything is looking good, now we can view all of the pods that are currently running on the system to make sure everything is functioning like it should. Remember, these pods are used by Kubernetes to keep Kuberentes (and Calico networking running)
+```bash
+kubectl get pods -A
+```
+![collector][/assets/k8s/k89.png]
+
+The last demonstration before I post the full playbook is to prove that we can run a container. For this we will just run a basic nginx container and make sure it's running:
+```bash
+kubectl run nginx --image=nginx
+
+kubectl describe pod nginx
+```
+![collector][/assets/k8s/k810.png]
+```yaml
+---
+- name: Persistently disable swap
+  hosts: all
+  tasks:
+    - name: Disable swap for current session
+      command: swapoff -a
+      register: result
+      changed_when:
+        - result.rc == 0
+
+    - name: Disable Swap permanently
+      replace:
+        path: /etc/fstab
+        regexp: '^(\s*)([^#\n]+\s+)(\w+\s+)swap(\s+.*)$'
+        replace: '#\1\2\3swap\4'
+        backup: yes
+        
+- name: Disable SElinux and Add Kube Repo
+  hosts: all
+  tasks:
+  - name: Set SELinux to permissive mode temporarily
+    command: setenforce 0
+    register: result2
+    changed_when:
+      - result2.rc == 0
+
+  - name: Disable SELinux permanently
+    command: sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+    register: result3
+    changed_when:
+      - result3.rc == 0
+
+  - name: Add Kubernetes repository
+    blockinfile:
+      path: /etc/yum.repos.d/kubernetes.repo
+      state: present
+      create: yes
+      block: |
+        [kubernetes]
+        name=Kubernetes
+        baseurl=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/
+        enabled=1
+        gpgcheck=1
+        gpgkey=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/repodata/repomd.xml.key
+        exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
+
+- name: Download and Configure Containerd
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Download containerd
+      get_url:
+        url: https://github.com/containerd/containerd/releases/download/v2.0.0/containerd-2.0.0-linux-amd64.tar.gz
+        dest: /tmp/containerd-2.0.0-linux-amd64.tar.gz
+
+    - name: Extract containerd
+      unarchive:
+        src: /tmp/containerd-2.0.0-linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: yes
+
+    - name: Create systemd directory
+      file:
+        path: /usr/local/lib/systemd/system
+        state: directory
+        mode: '0755'
+
+    - name: Download containerd.service
+      get_url:
+        url: https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+        dest: /usr/local/lib/systemd/system/containerd.service
+        mode: '0644'
+
+    - name: Copy runc to /usr/local/sbin
+      copy:
+        src: /usr/bin/runc
+        dest: /usr/local/sbin/runc
+        mode: '0755' 
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start containerd service
+      systemd:
+        name: containerd
+        state: started
+        enabled: yes
+
+    - name: Create CNI bin directory
+      file:
+        path: /opt/cni/bin
+        state: directory
+        mode: '0755'
+
+    - name: Download CNI plugins
+      get_url:
+        url: https://github.com/containernetworking/plugins/releases/download/v1.6.1/cni-plugins-linux-amd64-v1.6.1.tgz
+        dest: /tmp/cni-plugins-linux-amd64-v1.6.1.tgz
+
+    - name: Extract CNI plugins
+      unarchive:
+        src: /tmp/cni-plugins-linux-amd64-v1.6.1.tgz
+        dest: /opt/cni/bin
+        remote_src: yes 
+
+    - name: Create containerd config directory
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+
+    - name: Copy containerd config file from controller
+      copy:
+        src: kube_config.toml  
+        dest: /etc/containerd/config.toml
+        mode: '0644'
+      
+    - name: Restart containerd
+      ansible.builtin.systemd_service:
+        name: containerd.service
+        state: restarted
+
+- name: Install Kubelet/Kubectl/Kubeadm
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Download libnetfilter_cttimeout
+      get_url:
+        url: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libnetfilter_cttimeout-1.0.0-19.el9.x86_64.rpm
+        dest: /tmp/libnetfilter_cttimeout-1.0.0-19.el9.x86_64.rpm
+
+    - name: Download libnetfilter_cthelper
+      get_url:
+        url: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libnetfilter_cthelper-1.0.0-22.el9.x86_64.rpm
+        dest: /tmp/libnetfilter_cthelper-1.0.0-22.el9.x86_64.rpm
+
+    - name: Download libnetfilter_queue
+      get_url:
+        url: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/libnetfilter_queue-1.0.5-1.el9.x86_64.rpm
+        dest: /tmp/libnetfilter_queue-1.0.5-1.el9.x86_64.rpm
+
+    - name: Download conntrack-tools
+      get_url:
+        url: https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/conntrack-tools-1.4.7-4.el9.x86_64.rpm
+        dest: /tmp/conntrack-tools-1.4.7-4.el9.x86_64.rpm
+
+    - name: Import CentOS 9 Stream GPG key
+      rpm_key:
+        key: https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official
+        state: present
+
+    - name: Install conntrack-tools
+      ansible.builtin.dnf:
+        name: 
+          - /tmp/libnetfilter_cttimeout-1.0.0-19.el9.x86_64.rpm
+          - /tmp/libnetfilter_cthelper-1.0.0-22.el9.x86_64.rpm
+          - /tmp/libnetfilter_queue-1.0.5-1.el9.x86_64.rpm
+          - /tmp/conntrack-tools-1.4.7-4.el9.x86_64.rpm
+        state: present
+    
+    - name: Install kubeadm, kubelet and kubectl
+      dnf:
+        name:
+          - kubeadm
+          - kubectl
+          - kubelet
+        state: present
+        disable_excludes: kubernetes
+
+    - name: Enable and start kubelet service
+      service:
+        name: kubelet
+        state: started
+        enabled: yes
+
+- name: Initialize kubeadm
+  hosts: Manager
+  gather_facts: yes
+  vars:
+    pod_cidr: 10.10.0.0/16
+
+  tasks:
+    - name: Check if Kubernetes is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_config
+
+    - name: Initialize kubeadm
+      shell: |
+        kubeadm init \
+          --apiserver-advertise-address={{ ansible_host }} \
+          --apiserver-cert-extra-sans={{ ansible_host }} \
+          --pod-network-cidr={{ pod_cidr }} \
+          --cri-socket=unix:///var/run/containerd/containerd.sock \
+          --control-plane-endpoint={{ ansible_host }}
+      when: not kubeadm_config.stat.exists
+      args:
+        executable: /bin/bash
+
+    - name: Set up kubeconfig for root
+      block:
+        - name: Create .kube directory
+          ansible.builtin.file:
+            path: /root/.kube
+            state: directory
+            mode: 0755
+
+        - name: Copy admin.conf to kubeconfig
+          ansible.builtin.copy:
+            src: /etc/kubernetes/admin.conf
+            dest: /root/.kube/config
+            remote_src: yes
+            mode: 0775
+
+        - name: Set ownership of kubeconfig
+          ansible.builtin.file:
+            path: /root/.kube/config
+            owner: root
+            group: root
+            mode: '0600'
+      when: not kubeadm_config.stat.exists
+
+- name: Install CNI (calico)
+  hosts: Manager
+  gather_facts: false
+  tasks:
+    - name: Pull tigera calico operator
+      get_url:
+        url: https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
+        dest: /root/tigera_operator.yaml
+
+    - name: Apply tigera calico operator
+      shell: kubectl create -f /root/tigera_operator.yaml
+      args:
+        executable: /bin/bash
+      register: result7
+      changed_when:
+        - result7.rc == 0
+    
+    - name: Pull custom-resources for calico
+      get_url:
+        url: https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
+        dest: /root/calico_custom-resource.yaml
+
+    - name: Replace CIDR in /root/calico_custom-resource.yaml
+      replace:
+        path: /root/calico_custom-resource.yaml
+        regexp: 'cidr: 192\.168\.0\.0/16'
+        replace: 'cidr: 10.10.0.0/16'
+
+    - name: Apply tigera calico operator
+      shell: kubectl create -f /root/calico_custom-resource.yaml
+      args:
+        executable: /bin/bash
+      register: result8
+      changed_when:
+        - result8.rc == 0
+
+    - name: Wait for Calico Pods to Initialize
+      pause:
+        minutes: 2
+
+    - name: Remove taint from control plane nodes
+      shell: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+      args:
+        executable: /bin/bash
+      register: result4
+      changed_when:
+        - result4.rc == 0
+
+- name: Generate and Distribute Kubeadm Join Token
+  hosts: Manager
+  tasks:
+    - name: Get kubeadm join token
+      shell: kubeadm token create --print-join-command
+      args:
+        executable: /bin/bash
+      register: join_token
+      changed_when: join_token.rc == 0
+
+    - name: Save token to local file on Ansible control node
+      delegate_to: localhost
+      copy:
+        content: "{{ join_token.stdout }}"
+        dest: "/tmp/join_token.txt"
+
+- name: Join worker Nodes
+  hosts: Workers
+  gather_facts: yes
+  tasks:
+    - name: Copy token file from Ansible control node to workers
+      copy:
+        src: "/tmp/join_token.txt"
+        dest: "/tmp/join_token.txt"
+        
+    - name: Get token from file
+      command: cat /tmp/join_token.txt
+      register: token_from_file
+
+    - name: Register nodes
+      shell: "{{ token_from_file.stdout }}"
+      args:
+        executable: /bin/bash
+      register: result5
+      changed_when:
+        - result5.rc == 0
+
+```
+#More information
+To get access to these scripts and more, please feel free to visit my github page:
+[K8s Install](https://github.com/TNiconic/Personal_Playbooks/tree/main/kube_deploy)
+
+Again, thank so much for taking the time to read and have a great day!
