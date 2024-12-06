@@ -21,7 +21,7 @@ timezone: America/New_York
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Mitchell Gibson Docs                          # the main title
+title: Mitchell Gibson Blog                          # the main title
 
 tagline: A site for all my personal projects   # it will display as the sub-title
 
