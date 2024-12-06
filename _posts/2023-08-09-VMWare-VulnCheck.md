@@ -8,7 +8,7 @@ tags: [vmware,vcenter,stig,vulnerabiiltycheck]
 
 ---
 
-# VMWare Vulnerability Check
+# VMWare Vuln Check
 Hello! And welcome back to my blog, today we're going to be exploring something a little different; which is the topic of cybersecurity governance and cybersecurtiy vulnerability assessment. But what do these terms really mean? In short, we are checking the validity and health of a system in the scope of a risk assessment; using pre-defined "rules/criteria" that the United States government utilizes to determine if a system meets their operating standard. Even more blunty; the government publishes guides for specific systems that are meant to be used to determine the "health" of a particular system. This is great news for us! This means that individuals have already done the hard work determining security controls and best practices that we can follow to secure our systems.... only one problem.
 
 These checks can be long, cumbersome and often confusing for even a skilled CyberSecurity practitioner. Which leads me to the purpose of this blog and the mini-project I've created. But before we get too in the weeds, let's go over some concepts.
